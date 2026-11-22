@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Asisten Layanan Suzuki Cinere — RAG Chatbot</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .prose table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.825rem; display: block; overflow-x: auto; }
+    .prose th, .prose td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; white-space: nowrap; }
+    .prose th { background-color: #f8fafc; font-weight: 600; color: #1e293b; }
+    .prose tr:nth-child(even) { background-color: rgba(248, 250, 252, 0.6); }
+    .prose ul, .prose ol { margin-left: 1.25rem; margin-top: 0.35rem; margin-bottom: 0.35rem; }
+    .prose ul { list-style-type: disc; }
+    .prose ol { list-style-type: decimal; }
+    .prose p { margin-bottom: 0.5rem; }
+    .prose p:last-child { margin-bottom: 0; }
+    .prose strong { font-weight: 600; }
+
+    /* Dark Mode Prose Overrides */
+    .dark .prose th, .dark .prose td { border-color: #334155; }
+    .dark .prose th { background-color: #1e293b; color: #f1f5f9; }
+    .dark .prose tr:nth-child(even) { background-color: rgba(30, 41, 59, 0.5); }
+    .dark .prose strong { color: #f8fafc; }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .dark ::-webkit-scrollbar-thumb { background: #475569; }
+    .dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+    /* Typing Indicator */
+    .dot-flashing { position: relative; width: 6px; height: 6px; border-radius: 5px; background-color: #2563eb; animation: dot-flashing 1s infinite linear alternate; animation-delay: 0.5s; }
+    .dot-flashing::before, .dot-flashing::after { content: ""; display: inline-block; position: absolute; top: 0; width: 6px; height: 6px; border-radius: 5px; background-color: #2563eb; animation: dot-flashing 1s infinite alternate; }
+    .dot-flashing::before { left: -10px; animation-delay: 0s; }
+    .dot-flashing::after { left: 10px; animation-delay: 1s; }
+    @keyframes dot-flashing { 0% { background-color: #2563eb; } 50%, 100% { background-color: #bfdbfe; } }
+  </style>
+  <script>
+    // Terapkan tema tersimpan sebelum render untuk mencegah kedipan layar
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 h-screen flex overflow-hidden transition-colors duration-200">
+
+  <!-- OVERLAY MOBILE -->
+  <div id="sidebarOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/60 z-20 hidden lg:hidden backdrop-blur-xs"></div>
+
+  <!-- SIDEBAR KIRI: BASIS PENGETAHUAN & KONTROL -->
+  <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-30 w-80 bg-slate-900 dark:bg-slate-900 text-slate-100 flex flex-col border-r border-slate-800 shrink-0 transform -translate-x-full lg:translate-x-0 transition-all duration-200 ease-in-out overflow-hidden">
+    <div class="p-5 border-b border-slate-800/80 flex items-center justify-between min-w-[20rem]">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center font-bold text-white text-xl shadow-lg shadow-blue-900/40">
+          S
+        </div>
+        <div>
+          <h1 class="font-bold text-base tracking-tight text-white">Suzuki Cinere AI</h1>
+          <p class="text-[11px] text-slate-400">PT. Duta Cendana Adimandiri</p>
+        </div>
+      </div>
+      <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition" title="Sembunyikan Sidebar">
+        ✕
+      </button>
+    </div>
+
+    <!-- Upload Dokumen (Drag & Drop) -->
+    <div class="p-4 border-b border-slate-800/80 min-w-[20rem]">
+      <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+        Tambah Basis Pengetahuan
+      </label>
+      <form id="uploadForm" class="space-y-2.5">
+        <label id="dropZone" for="fileInput"
+          class="flex flex-col items-center justify-center border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-xl p-3.5 text-center cursor-pointer bg-slate-800/40 hover:bg-slate-800/80 transition">
+          <svg class="w-6 h-6 text-blue-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+          <span id="fileNameLabel" class="text-xs text-slate-300 font-medium truncate max-w-full px-2">
+            Klik atau seret file PDF / DOCX
+          </span>
+          <span class="text-[10px] text-slate-500 mt-0.5">Maks. 20MB (PDF, DOCX, TXT)</span>
+          <input type="file" id="fileInput" accept=".pdf,.docx,.txt" class="hidden" />
+        </label>
+
+        <button type="submit" id="uploadBtn"
+          class="w-full py-2 px-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white rounded-lg text-xs font-semibold transition shadow-sm flex items-center justify-center gap-1.5">
+          <span>+ Indeks Dokumen</span>
+        </button>
+      </form>
+      <p id="uploadStatus" class="text-[11px] mt-2 hidden leading-snug"></p>
+    </div>
+
+    <!-- Filter & Daftar Dokumen -->
+    <div class="p-4 flex-1 overflow-y-auto flex flex-col min-w-[20rem]">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Dokumen Aktif</span>
+        <span id="docCount" class="text-[11px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full">0</span>
+      </div>
+
+      <select id="docFilter"
+        class="w-full mb-3 bg-slate-800 border border-slate-700 text-xs rounded-lg px-2.5 py-2 text-slate-200 focus:outline-none focus:border-blue-500 transition">
+        <option value="">Semua Dokumen (Global)</option>
+      </select>
+
+      <ul id="docList" class="space-y-1.5 text-xs flex-1">
+        <li class="text-slate-500 text-center py-4 italic">Memuat dokumen...</li>
+      </ul>
+    </div>
+
+    <!-- Footer Sidebar: Reset Memori -->
+    <div class="p-4 border-t border-slate-800/80 space-y-2 min-w-[20rem]">
+      <button onclick="resetChat()"
+        class="w-full py-2 px-3 bg-rose-950/50 hover:bg-rose-900/70 text-rose-300 border border-rose-800/60 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+        <span>Reset Percakapan</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- AREA UTAMA: CHATBOT -->
+  <main class="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 min-w-0 transition-colors duration-200">
+    <!-- Top Header -->
+    <header class="h-16 border-b border-slate-200 dark:border-slate-800 px-4 lg:px-6 flex items-center justify-between bg-white dark:bg-slate-900 shrink-0 transition-colors duration-200">
+      <div class="flex items-center gap-3 min-w-0">
+        <!-- Tombol Toggle Sidebar (Aktif di Mobile & Desktop) -->
+        <button onclick="toggleSidebar()" class="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition" title="Tampilkan / Sembunyikan Sidebar">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div class="truncate">
+          <h2 class="font-bold text-sm lg:text-base text-slate-800 dark:text-slate-100 truncate">Layanan Informasi Produk & Simulasi Kredit</h2>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate">Hybrid RAG (BM25 + ChromaDB) • Groq Llama 3.3 • Anti-Halusinasi</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <!-- Status API -->
+        <div id="apiStatusBadge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+          <span id="apiStatusDot" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+          <span id="apiStatusText" class="hidden sm:inline">Mengecek API...</span>
+        </div>
+
+        <!-- Tombol Ganti Tema (Light / Dark) -->
+        <button onclick="toggleTheme()" id="themeToggleBtn"
+          class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-amber-300 border border-slate-300 dark:border-slate-700 transition"
+          title="Ganti Tema Terang / Gelap">
+          <!-- Ikon Bulan (Muncul saat Light Mode) -->
+          <svg id="moonIcon" class="w-4 h-4 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+          </svg>
+          <!-- Ikon Matahari (Muncul saat Dark Mode) -->
+          <svg id="sunIcon" class="w-4 h-4 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        </button>
+
+        <a href="/docs" target="_blank"
+          class="hidden sm:inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium border border-slate-300 dark:border-slate-700 transition">
+          <span>API Docs</span>
+          <span>↗</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Chat Messages Container -->
+    <div id="chatBox" class="flex-1 overflow-y-auto p-4 lg:p-6 space-y-5">
+      <div class="max-w-3xl mx-auto bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors">
+        <div class="flex items-start gap-3.5">
+          <div class="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0 border border-blue-100 dark:border-blue-800">
+            AI
+          </div>
+          <div class="space-y-3 flex-1">
+            <p class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+              Halo! Selamat datang di <strong class="text-slate-900 dark:text-white">Asisten Layanan Suzuki Cinere</strong>. Tanyakan seputar
+              <strong class="text-slate-900 dark:text-white">harga OTR terbaru, paket kredit/TDP, spesifikasi varian mobil, maupun ketentuan booking fee & inden</strong>.
+              Setiap jawaban disertai kutipan dokumen resmi.
+            </p>
+            <div>
+              <p class="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Contoh Pertanyaan Cepat:</p>
+              <div class="flex flex-wrap gap-2">
+                <button onclick="sendQuery('Berapa harga OTR XL7 Alpha AT Hybrid Two Tone?')"
+                  class="text-xs bg-slate-50 dark:bg-slate-800/80 hover:bg-blue-50 dark:hover:bg-blue-950/60 text-slate-700 dark:text-slate-300 hover:text-blue-700 dark:hover:text-blue-300 border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 px-3 py-1.5 rounded-lg transition text-left">
+                  🚗 Harga OTR XL7 Alpha Hybrid Two Tone
+                </button>
+                <button onclick="sendQuery('Sebutkan seluruh tipe kendaraan pada paket Sufi Eazy Flexi Step Payment')"
+                  class="text-xs bg-slate-50 dark:bg-slate-800/80 hover:bg-blue-50 dark:hover:bg-blue-950/60 text-slate-700 dark:text-slate-300 hover:text-blue-700 dark:hover:text-blue-300 border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 px-3 py-1.5 rounded-lg transition text-left">
+                  💳 Daftar Paket Kredit Sufi Eazy Flexi
+                </button>
+                <button onclick="sendQuery('Berapa lama pengembalian booking fee jika kredit ditolak leasing?')"
+                  class="text-xs bg-slate-50 dark:bg-slate-800/80 hover:bg-blue-50 dark:hover:bg-blue-950/60 text-slate-700 dark:text-slate-300 hover:text-blue-700 dark:hover:text-blue-300 border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 px-3 py-1.5 rounded-lg transition text-left">
+                  📄 Ketentuan Pengembalian Booking Fee
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input Box -->
+    <footer class="p-3 lg:p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0 transition-colors">
+      <form id="chatForm" class="max-w-3xl mx-auto">
+        <div class="flex items-end gap-2 bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 rounded-2xl p-2 transition">
+          <textarea id="queryInput" rows="1"
+            placeholder="Ketik pertanyaan Anda (contoh: Berapa TDP Jimny 5 Door AT 2Tone?)..."
+            class="flex-1 bg-transparent border-0 px-2.5 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none resize-none max-h-32"></textarea>
+          <button type="submit" id="sendBtn"
+            class="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-1.5 shrink-0">
+            <span>Kirim</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+          </button>
+        </div>
+        <div class="flex justify-between items-center mt-1.5 px-1 text-[11px] text-slate-400 dark:text-slate-500">
+          <span>Tekan <strong>Enter</strong> untuk mengirim, <strong>Shift + Enter</strong> untuk baris baru</span>
+          <span id="activeFilterLabel">Filter: Semua Dokumen</span>
+        </div>
+      </form>
+    </footer>
+  </main>
+
+  <script>
+    const chatBox = document.getElementById('chatBox');
+    const chatForm = document.getElementById('chatForm');
+    const queryInput = document.getElementById('queryInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const docList = document.getElementById('docList');
+    const docFilter = document.getElementById('docFilter');
+    const docCount = document.getElementById('docCount');
+    const fileInput = document.getElementById('fileInput');
+    const fileNameLabel = document.getElementById('fileNameLabel');
+    const dropZone = document.getElementById('dropZone');
+
+    // Toggle Sidebar untuk Desktop & Mobile
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      const isDesktop = window.innerWidth >= 1024;
+
+      if (isDesktop) {
+        // Di desktop: lipat lebar sidebar menjadi 0 agar area chat melebar penuh
+        if (sidebar.classList.contains('lg:w-0')) {
+          sidebar.classList.remove('lg:w-0', 'lg:border-r-0');
+          sidebar.classList.add('w-80', 'border-r');
+        } else {
+          sidebar.classList.remove('w-80', 'border-r');
+          sidebar.classList.add('lg:w-0', 'lg:border-r-0');
+        }
+      } else {
+        // Di mobile/tablet: slide-in/out drawer + overlay
+        sidebar.classList.toggle('-translate-x-full');
+        overlay.classList.toggle('hidden');
+      }
+    }
+
+    // Toggle Tema Terang / Gelap
+    function toggleTheme() {
+      const html = document.documentElement;
+      html.classList.toggle('dark');
+      const isDark = html.classList.contains('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function setApiStatus(connected) {
+      const badge = document.getElementById('apiStatusBadge');
+      const dot = document.getElementById('apiStatusDot');
+      const text = document.getElementById('apiStatusText');
+      if (connected) {
+        badge.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+        text.textContent = 'API Terhubung';
+      } else {
+        badge.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800';
+        dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+        text.textContent = 'API Terputus';
+      }
+    }
+
+    // Filter label
+    docFilter.addEventListener('change', () => {
+      const val = docFilter.value;
+      document.getElementById('activeFilterLabel').textContent = val ? `Filter: ${val}` : 'Filter: Semua Dokumen';
+    });
+
+    // Auto-resize textarea & Enter submit
+    queryInput.addEventListener('input', function () {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 128) + 'px';
+    });
+
+    queryInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendQuery(queryInput.value);
+      }
+    });
+
+    // Drag & Drop File Upload
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) fileNameLabel.textContent = fileInput.files[0].name;
+    });
+
+    ['dragenter', 'dragover'].forEach(evt => {
+      dropZone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropZone.classList.add('border-blue-500', 'bg-slate-800');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evt => {
+      dropZone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropZone.classList.remove('border-blue-500', 'bg-slate-800');
+      });
+    });
+
+    dropZone.addEventListener('drop', e => {
+      if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        fileNameLabel.textContent = e.dataTransfer.files[0].name;
+      }
+    });
+
+    async function loadDocuments() {
+      try {
+        const res = await fetch('/api/documents');
+        if (!res.ok) throw new Error('API Error');
+        const data = await res.json();
+        setApiStatus(true);
+
+        const docs = data.documents || [];
+        docCount.textContent = docs.length;
+
+        const currentSelected = docFilter.value;
+        docFilter.innerHTML = '<option value="">Semua Dokumen (Global)</option>';
+        docList.innerHTML = '';
+
+        if (docs.length === 0) {
+          docList.innerHTML = '<li class="text-slate-500 text-center py-4 italic">Belum ada dokumen terindeks.</li>';
+          return;
+        }
+
+        docs.forEach(doc => {
+          const opt = document.createElement('option');
+          opt.value = doc;
+          opt.textContent = doc;
+          docFilter.appendChild(opt);
+
+          const li = document.createElement('li');
+          li.className = 'group flex items-center justify-between bg-slate-800/70 hover:bg-slate-800 px-2.5 py-2 rounded-lg border border-slate-700/60 transition';
+          li.innerHTML = `
+            <div class="flex items-center gap-2 min-w-0 pr-2">
+              <span class="text-blue-400 shrink-0">📄</span>
+              <span class="truncate text-slate-200 text-xs" title="${escapeHtml(doc)}">${escapeHtml(doc)}</span>
+            </div>
+            <button onclick="deleteDoc('${doc.replace(/'/g, "\\'")}')" class="opacity-60 group-hover:opacity-100 text-rose-400 hover:text-rose-300 font-bold px-1.5 py-0.5 rounded hover:bg-rose-950/60 transition" title="Hapus dokumen">✕</button>
+          `;
+          docList.appendChild(li);
+        });
+
+        docFilter.value = currentSelected;
+      } catch (err) {
+        console.error(err);
+        setApiStatus(false);
+        docList.innerHTML = '<li class="text-rose-400 text-center py-4 text-[11px]">Tidak dapat terhubung ke server FastAPI.</li>';
+      }
+    }
+
+    function appendUserMessage(text) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'max-w-3xl mx-auto flex justify-end';
+      wrapper.innerHTML = `
+        <div class="max-w-xl bg-blue-600 text-white rounded-2xl rounded-tr-xs px-4 py-3 text-sm shadow-xs leading-relaxed whitespace-pre-wrap">${escapeHtml(text)}</div>
+      `;
+      chatBox.appendChild(wrapper);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function appendBotMessage(answer, citations, latency, isError = false) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'max-w-3xl mx-auto flex items-start gap-3';
+
+      let citationHtml = '';
+      if (citations && citations.length > 0) {
+        const items = citations.map(c => `
+          <div class="bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 rounded-lg p-2.5 text-xs">
+            <div class="font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+              <span>📑 ${escapeHtml(c.source)}</span>
+              <span class="bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 px-1.5 py-0.2 rounded text-[10px]">Hal. ${c.page}</span>
+            </div>
+            <div class="text-slate-600 dark:text-slate-400 mt-1 italic leading-relaxed">"${escapeHtml(c.snippet)}..."</div>
+          </div>
+        `).join('');
+
+        citationHtml = `
+          <details class="pt-2.5 border-t border-slate-100 dark:border-slate-800">
+            <summary class="text-xs font-semibold text-slate-600 dark:text-slate-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 select-none">
+              Lihat Sumber Referensi (${citations.length} kutipan dokumen)
+            </summary>
+            <div class="mt-2.5 space-y-2">${items}</div>
+          </details>
+        `;
+      }
+
+      const cardStyle = isError
+        ? 'bg-rose-50 dark:bg-rose-950/50 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200'
+        : 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 text-slate-800 dark:text-slate-200';
+
+      wrapper.innerHTML = `
+        <div class="w-8 h-8 rounded-xl ${isError ? 'bg-rose-100 dark:bg-rose-900 text-rose-600 dark:text-rose-200' : 'bg-blue-600 text-white'} flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+          AI
+        </div>
+        <div class="flex-1 min-w-0 border ${cardStyle} rounded-2xl rounded-tl-xs p-4 shadow-xs space-y-3 transition-colors">
+          <div class="prose text-sm leading-relaxed max-w-none dark:text-slate-200">${marked.parse(answer)}</div>
+          ${citationHtml}
+          <div class="flex items-center justify-between pt-1 text-[11px] text-slate-400 dark:text-slate-500">
+            <button class="copy-btn hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1 transition cursor-pointer">
+              📋 Salin jawaban
+            </button>
+            <span>Respons: ${latency} dtk</span>
+          </div>
+        </div>
+      `;
+
+      const copyBtn = wrapper.querySelector('.copy-btn');
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(answer).then(() => {
+          const original = copyBtn.innerHTML;
+          copyBtn.innerHTML = '✓ Tersalin';
+          copyBtn.classList.add('text-emerald-600', 'dark:text-emerald-400');
+          setTimeout(() => {
+            copyBtn.innerHTML = original;
+            copyBtn.classList.remove('text-emerald-600', 'dark:text-emerald-400');
+          }, 1800);
+        });
+      });
+
+      chatBox.appendChild(wrapper);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function sendQuery(queryText) {
+      if (!queryText.trim()) return;
+      appendUserMessage(queryText);
+      queryInput.value = '';
+      queryInput.style.height = 'auto';
+      sendBtn.disabled = true;
+
+      const loadingId = 'loading-' + Date.now();
+      const loadWrapper = document.createElement('div');
+      loadWrapper.id = loadingId;
+      loadWrapper.className = 'max-w-3xl mx-auto flex items-center gap-3';
+      loadWrapper.innerHTML = `
+        <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">AI</div>
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-3.5 shadow-xs flex items-center gap-4">
+          <div class="dot-flashing ml-2"></div>
+          <span class="text-xs text-slate-500 dark:text-slate-400">Mencari referensi di dokumen resmi Suzuki...</span>
+        </div>
+      `;
+      chatBox.appendChild(loadWrapper);
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: queryText,
+            selected_doc: docFilter.value || null
+          })
+        });
+        const data = await res.json();
+        document.getElementById(loadingId)?.remove();
+        setApiStatus(true);
+
+        if (!res.ok) {
+          appendBotMessage(`Terjadi kesalahan: ${data.detail || 'Gagal memproses permintaan.'}`, [], 0, true);
+        } else {
+          appendBotMessage(data.answer, data.citations, data.latency_sec);
+        }
+      } catch (err) {
+        document.getElementById(loadingId)?.remove();
+        setApiStatus(false);
+        appendBotMessage('Gagal terhubung ke server FastAPI. Pastikan Uvicorn berjalan di port 8000.', [], 0, true);
+      } finally {
+        sendBtn.disabled = false;
+        queryInput.focus();
+      }
+    }
+
+    chatForm.addEventListener('submit', e => {
+      e.preventDefault();
+      sendQuery(queryInput.value);
+    });
+
+    document.getElementById('uploadForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const statusEl = document.getElementById('uploadStatus');
+      const uploadBtn = document.getElementById('uploadBtn');
+
+      if (!fileInput.files.length) {
+        statusEl.textContent = 'Pilih file PDF/DOCX terlebih dahulu.';
+        statusEl.className = 'text-[11px] mt-2 text-amber-400 block';
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      uploadBtn.disabled = true;
+      statusEl.textContent = '⏳ Mengunggah & mengindeks dokumen...';
+      statusEl.className = 'text-[11px] mt-2 text-amber-300 block';
+
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (res.ok) {
+          statusEl.textContent = `✓ ${data.message}`;
+          statusEl.className = 'text-[11px] mt-2 text-emerald-400 block';
+          fileInput.value = '';
+          fileNameLabel.textContent = 'Klik atau seret file PDF / DOCX';
+          loadDocuments();
+        } else {
+          statusEl.textContent = `✕ ${data.detail || 'Gagal mengunggah.'}`;
+          statusEl.className = 'text-[11px] mt-2 text-rose-400 block';
+        }
+      } catch (err) {
+        statusEl.textContent = '✕ Error jaringan saat mengunggah dokumen.';
+        statusEl.className = 'text-[11px] mt-2 text-rose-400 block';
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    });
+
+    async function deleteDoc(filename) {
+      if (!confirm(`Hapus dokumen "${filename}" dari basis pengetahuan?`)) return;
+      try {
+        await fetch(`/api/documents/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+        loadDocuments();
+      } catch (err) {
+        alert('Gagal menghapus dokumen.');
+      }
+    }
+
+    async function resetChat() {
+      try {
+        await fetch('/api/reset', { method: 'POST' });
+        chatBox.innerHTML = '<div class="max-w-3xl mx-auto text-xs text-center text-slate-400 dark:text-slate-500 py-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/70 dark:border-slate-800">Memori percakapan telah dibersihkan. Silakan ajukan pertanyaan baru.</div>';
+      } catch (err) {
+        alert('Gagal mereset percakapan.');
+      }
+    }
+
+    loadDocuments();
+  </script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+[
+  {
+    "id": "Q01",
+    "category": "exact_price",
+    "question": "Berapa harga OTR Suzuki Jimny 5-Door AT Two Tone?",
+    "expected_source": "pricelist_suzuki_cinere.pdf",
+    "expected_keywords": ["Jimny", "5-Door", "AT", "Two Tone", "Rp"],
+    "out_of_domain": false
+  },
+  {
+    "id": "Q02",
+    "category": "exact_price",
+    "question": "Berapa harga OTR untuk All New Ertiga Hybrid tipe GX AT?",
+    "expected_source": "pricelist_suzuki_cinere.pdf",
+    "expected_keywords": ["Ertiga", "Hybrid", "GX", "AT", "Rp"],
+    "out_of_domain": false
+  },
+  {
+    "id": "Q03",
+    "category": "exact_price",
+    "question": "Sebutkan seluruh daftar harga OTR untuk semua tipe Suzuki XL7 Hybrid!",
+    "expected_source": "pricelist_suzuki_cinere.pdf",
+    "expected_keywords": ["XL7", "Hybrid", "Zeta", "Beta", "Alpha", "Rp"],
+    "out_of_domain": false
+  },
+  {
+    "id": "Q04",
+    "category": "credit_package",
+    "question": "Berapa besaran TDP dan angsuran per bulan untuk Suzuki Baleno AT tenor 5 tahun?",
+    "expected_source": "paket_kredit_suzuki.pdf",
+    "expected_keywords": ["Baleno", "TDP", "Rp"],
+    "out_of_domain": false
+  },
+  {
+    "id": "Q05",
+    "category": "credit_package",
+    "question": "Berapa DP minimal untuk kredit Suzuki S-Presso AT dan berapa cicilannya untuk tenor 48 bulan?",
+    "expected_source": "paket_kredit_suzuki.pdf",
+    "expected_keywords": ["S-Presso", "AT", "Rp"],
+    "out_of_domain": false
+  },
+  {
+    "id": "Q06",
+    "category": "credit_package",
+    "question": "Rincikan pilihan tenor dan angsuran kredit untuk New Carry Pick Up FD!",
+    "expected_source": "paket_kredit_suzuki.pdf",
+    "expected_keywords": ["Carry", "Pick Up", "FD", "Rp"],
+    "out_of_domain": false
+  },
+  {
+    "id": "Q07",
+    "category": "variant_specification",
+    "question": "Apa saja perbedaan fitur utama antara Suzuki XL7 Hybrid Alpha dan Beta?",
+    "expected_source": "brosur_xl7_hybrid.pdf",
+    "expected_keywords": ["XL7", "Alpha", "Beta"],
+    "out_of_domain": false
+  },
+  {
+    "id": "Q08",
+    "category": "variant_specification",
+    "question": "Berapa kapasitas mesin, tenaga maksimal, dan dimensi panjang Suzuki Grand Vitara?",
+    "expected_source": "brosur_grand_vitara.pdf",
+    "expected_keywords": ["Grand Vitara", "cc", "mm"],
+    "out_of_domain": false
+  },
+  {
+    "id": "Q09",
+    "category": "variant_specification",
+    "question": "Pilihan warna apa saja yang tersedia untuk Suzuki Jimny 3-Door?",
+    "expected_source": "brosur_jimny.pdf",
+    "expected_keywords": ["Jimny", "3-Door"],
+    "out_of_domain": false
+  },
+  {
+    "id": "Q10",
+    "category": "multi_turn_memory",
+    "keep_history": false,
+    "question": "Berapa harga OTR Suzuki Grand Vitara tipe GX Two Tone?",
+    "expected_source": "pricelist_suzuki_cinere.pdf",
+    "expected_keywords": ["Grand Vitara", "GX", "Two Tone", "Rp"],
+    "out_of_domain": false
+  },
+  {
+    "id": "Q11",
+    "category": "multi_turn_memory",
+    "keep_history": true,
+    "question": "Kalau yang Single Tone berapa harganya?",
+    "expected_source": "pricelist_suzuki_cinere.pdf",
+    "expected_keywords": ["Grand Vitara", "GX", "Single Tone", "Rp"],
+    "out_of_domain": false
+  },
+  {
+    "id": "Q12",
+    "category": "multi_turn_memory",
+    "keep_history": true,
+    "question": "TDP minimalnya berapa untuk tipe tersebut?",
+    "expected_source": "paket_kredit_suzuki.pdf",
+    "expected_keywords": ["Grand Vitara", "TDP", "Rp"],
+    "out_of_domain": false
+  },
+  {
+    "id": "Q13",
+    "category": "out_of_domain",
+    "keep_history": false,
+    "question": "Berapa harga OTR dan TDP kredit Toyota Innova Zenix Hybrid tipe V?",
+    "expected_source": null,
+    "expected_keywords": [],
+    "out_of_domain": true
+  },
+  {
+    "id": "Q14",
+    "category": "out_of_domain",
+    "keep_history": false,
+    "question": "Siapa pemenang kejuaraan MotoGP musim lalu dan kapan jadwal balapan berikutnya?",
+    "expected_source": null,
+    "expected_keywords": [],
+    "out_of_domain": true
+  },
+  {
+    "id": "Q15",
+    "category": "out_of_domain",
+    "keep_history": false,
+    "question": "Buatkan resep cara memasak nasi goreng spesial ala restoran!",
+    "expected_source": null,
+    "expected_keywords": [],
+    "out_of_domain": true
+  }
+]
