@@ -1,4 +1,4 @@
-import os
+﻿import os
 import json
 import hashlib
 import pdfplumber
@@ -28,7 +28,7 @@ def get_embeddings():
         try:
             _EMBEDDINGS_CACHE = HuggingFaceEmbeddings(
                 model_name=EMBEDDING_MODEL,
-                model_kwargs={"device": "cpu", "local_files_only": True},
+                model_kwargs={"device": "cpu", "local_files_only": False},
                 encode_kwargs={"normalize_embeddings": True, "batch_size": 32},
             )
         except Exception:
