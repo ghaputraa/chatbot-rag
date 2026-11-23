@@ -68,9 +68,14 @@ chatbot-rag/
 
 ### 1. Persiapan Lingkungan Virtual & Dependensi
 ```powershell
+# 1. Buat lingkungan virtual (virtual environment)
 python -m venv venv
+
+# 2. Aktifkan virtual environment (Windows PowerShell)
 .\venv\Scripts\activate
-pip install -r requirements.txt
+
+# 3. Instal seluruh dependensi ke dalam venv aktif
+python -m pip install -r requirements.txt
 ```
 
 ### 2. Konfigurasi API Key (`.env`)
@@ -91,13 +96,13 @@ data/raw/
 
 * **Mode 1 — Web UI & REST API FastAPI (Port `8000`):**
   ```powershell
-  uvicorn app.main:app --reload
+  python -m uvicorn app.main:app --reload
   ```
   Akses antarmuka web di `http://127.0.0.1:8000` atau dokumentasi API Swagger di `http://127.0.0.1:8000/docs`.
 
 * **Mode 2 — Dashboard Interaktif Streamlit (Port `8501`):**
   ```powershell
-  streamlit run app/ui_app.py
+  python -m streamlit run app/ui_app.py
   ```
   Akses aplikasi di `http://localhost:8501`.
 
