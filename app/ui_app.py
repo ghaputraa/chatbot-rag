@@ -1,3 +1,8 @@
+﻿import sys
+from pathlib import Path
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 import os
 import re
 import warnings
@@ -18,8 +23,8 @@ from app.core.rag_engine import ConversationalHybridRAG
 # KONFIGURASI HALAMAN STREAMLIT
 # ==============================================================================
 st.set_page_config(
-    page_title="Suzuki Cinere — Hybrid RAG Assistant",
-    page_icon="🤖",
+    page_title="Suzuki Cinere â€” Hybrid RAG Assistant",
+    page_icon="ðŸ¤–",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -72,7 +77,7 @@ rag_engine: ConversationalHybridRAG = st.session_state.rag_engine
 # SIDEBAR: MANAJEMEN DOKUMEN & PENGATURAN RAG
 # ==============================================================================
 with st.sidebar:
-    st.title("📂 Manajemen Dokumen")
+    st.title("ðŸ“‚ Manajemen Dokumen")
     st.caption(f"Model Utama: `{LLM_MODEL}`\nFallback: `{', '.join(FALLBACK_LLM_MODELS)}`")
     st.divider()
 
@@ -85,7 +90,7 @@ with st.sidebar:
         accept_multiple_files=True,
     )
 
-    if uploaded_files and st.button("📥 Simpan & Indeks Dokumen", use_container_width=True):
+    if uploaded_files and st.button("ðŸ“¥ Simpan & Indeks Dokumen", use_container_width=True):
         with st.spinner("Menyimpan dan mengindeks dokumen ke ChromaDB..."):
             saved_count = 0
             for uf in uploaded_files:
@@ -107,14 +112,14 @@ with st.sidebar:
     indexed_docs = list_indexed_documents(vector_store)
     doc_names = sorted(list(indexed_docs.keys()))
 
-    filter_options = ["🌐 Semua Dokumen"] + doc_names
+    filter_options = ["ðŸŒ Semua Dokumen"] + doc_names
     selected_option = st.selectbox(
         "Fokus pencarian pada:",
         options=filter_options,
         index=0,
     )
 
-    if selected_option == "🌐 Semua Dokumen":
+    if selected_option == "ðŸŒ Semua Dokumen":
         if rag_engine.active_filter is not None:
             rag_engine.set_document_filter(None)
     else:
@@ -131,9 +136,9 @@ with st.sidebar:
         for name in doc_names:
             col_name, col_del = st.columns([4, 1])
             with col_name:
-                st.markdown(f"📄 **{name}**  \n`{indexed_docs[name]} chunks`")
+                st.markdown(f"ðŸ“„ **{name}**  \n`{indexed_docs[name]} chunks`")
             with col_del:
-                if st.button("🗑️", key=f"del_{name}", help=f"Hapus {name}"):
+                if st.button("ðŸ—‘ï¸", key=f"del_{name}", help=f"Hapus {name}"):
                     delete_document_by_name(vector_store, name)
                     local_path = os.path.join(DATA_DIR, name)
                     if os.path.exists(local_path):
@@ -148,7 +153,7 @@ with st.sidebar:
     st.divider()
 
     # 4. Reset Percakapan & Memori
-    if st.button("🧹 Reset Riwayat Chat & Memori", use_container_width=True):
+    if st.button("ðŸ§¹ Reset Riwayat Chat & Memori", use_container_width=True):
         rag_engine.clear_history()
         st.session_state.messages = [
             {
@@ -162,12 +167,12 @@ with st.sidebar:
 # ==============================================================================
 # AREA UTAMA: ANTARMUKA CHAT BUBBLE
 # ==============================================================================
-st.header("🤖 Asisten Tanya-Jawab Suzuki Cinere (Hybrid RAG)")
+st.header("ðŸ¤– Asisten Tanya-Jawab Suzuki Cinere (Hybrid RAG)")
 
 active_scope_label = (
-    f"🎯 Fokus Dokumen: **{rag_engine.active_filter}**"
+    f"ðŸŽ¯ Fokus Dokumen: **{rag_engine.active_filter}**"
     if rag_engine.active_filter
-    else "🌐 Cakupan: **Semua Dokumen Terindeks**"
+    else "ðŸŒ Cakupan: **Semua Dokumen Terindeks**"
 )
 st.caption(f"{active_scope_label} | Mode: Hybrid Search (Cosine Vector + BM25) + Anti-Halusinasi")
 
@@ -177,7 +182,7 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"].replace("\n", "  \n"))
         citations = msg.get("citations", [])
         if citations:
-            with st.expander(f"📚 Lihat Sumber Rujukan ({len(citations)} bagian)"):
+            with st.expander(f"ðŸ“š Lihat Sumber Rujukan ({len(citations)} bagian)"):
                 for idx, c in enumerate(citations, 1):
                     src_name = c.get("source", c.get("document", "Dokumen"))
                     page_num = c.get("page", "-")
@@ -189,7 +194,7 @@ for msg in st.session_state.messages:
 # Input pertanyaan pengguna di bagian bawah layar
 if prompt := st.chat_input("Ketik pertanyaan Anda berdasarkan isi dokumen..."):
     if not doc_names:
-        st.warning("⚠️ Database dokumen masih kosong. Silakan unggah dokumen terlebih dahulu melalui sidebar kiri.")
+        st.warning("âš ï¸ Database dokumen masih kosong. Silakan unggah dokumen terlebih dahulu melalui sidebar kiri.")
     else:
         st.session_state.messages.append({"role": "user", "content": prompt, "citations": []})
         with st.chat_message("user"):
@@ -212,13 +217,13 @@ if prompt := st.chat_input("Ketik pertanyaan Anda berdasarkan isi dokumen..."):
                         ]
                 except Exception as e:
                     if "429" in str(e) or "rate_limit" in str(e).lower():
-                        answer_text = "⏳ Batas kecepatan API Groq tercapai. Tunggu beberapa detik lalu coba kembali."
+                        answer_text = "â³ Batas kecepatan API Groq tercapai. Tunggu beberapa detik lalu coba kembali."
                     else:
-                        answer_text = f"❌ Terjadi kesalahan sistem: {e}"
+                        answer_text = f"âŒ Terjadi kesalahan sistem: {e}"
 
             st.markdown(answer_text.replace("\n", "  \n"))
             if clean_citations:
-                with st.expander(f"📚 Lihat Sumber Rujukan ({len(clean_citations)} bagian)"):
+                with st.expander(f"ðŸ“š Lihat Sumber Rujukan ({len(clean_citations)} bagian)"):
                     for idx, c in enumerate(clean_citations, 1):
                         src_name = c.get("source", c.get("document", "Dokumen"))
                         page_num = c.get("page", "-")
