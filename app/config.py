@@ -3,8 +3,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
-os.environ["HF_HUB_OFFLINE"] = "0"
-os.environ["TRANSFORMERS_OFFLINE"] = "0"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Tentukan root folder proyek (chatbot-rag/) secara dinamis

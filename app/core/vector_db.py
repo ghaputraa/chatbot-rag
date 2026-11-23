@@ -25,9 +25,14 @@ MANIFEST_PATH = os.path.join(CHROMA_DIR, "indexed_manifest.json")
 def get_embeddings():
     global _EMBEDDINGS_CACHE
     if _EMBEDDINGS_CACHE is None:
-        os.environ["HF_HUB_OFFLINE"] = "0"
-        os.environ["TRANSFORMERS_OFFLINE"] = "0"
+        os.environ.pop("HF_HUB_OFFLINE", None)
+        os.environ.pop("TRANSFORMERS_OFFLINE", None)
         os.environ["HF_HOME"] = "/tmp/hf_cache"
+        try:
+            import huggingface_hub.constants
+            huggingface_hub.constants.HF_HUB_OFFLINE = False
+        except Exception:
+            pass
         try:
             _EMBEDDINGS_CACHE = HuggingFaceEmbeddings(
                 model_name=EMBEDDING_MODEL,
@@ -298,4 +303,5 @@ def list_documents(vector_store: Chroma) -> list[str]:
 def delete_document(vector_store: Chroma, filename: str) -> int:
     """Alias kompatibilitas untuk main.py: menghapus dokumen berdasarkan nama file."""
     return delete_document_by_name(vector_store, filename)
+
 
