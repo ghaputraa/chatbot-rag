@@ -127,7 +127,7 @@ data/raw/
 ## 👥 Struktur Tim Pengembang (Produk B)
 
 * **Ketua Tim Besar:** Angga Putra Prasetia Nugraha
-* **Sub-Tim Data & Domain:** Sendi *(Koordinator)*, Kayla, Itsna
-* **Sub-Tim Model & Analitik:** Neisya *(Koordinator)*, Tia, Angga Putra Prasetia Nugraha
-* **Sub-Tim Pengembangan Aplikasi:** Habibah *(Koordinator)*, Bintang, Hafidz
-* **Sub-Tim Pengujian & Kelayakan:** Aisyah *(Koordinator)*, Selvi
+* **Sub-Tim Data & Domain:** Kayla *(Koordinator)*, Itsna, Sendi
+* **Sub-Tim Model & Analitik:** Neisya *(Koordinator)*, Tia, Angga
+* **Sub-Tim Pengembangan Aplikasi:** Hafidz *(Koordinator)*, Bintang, Habibah 
+* **Sub-Tim Pengujian & Kelayakan:** Aisyah *(Koordinator)*, Selvi, Oyang
