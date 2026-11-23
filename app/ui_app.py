@@ -29,28 +29,32 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-#MainMenu, footer {visibility: hidden;}
-.block-container {padding-top: 1.5rem; padding-bottom: 5rem; max-width: 100%;}
+footer {visibility: hidden;}
+.block-container {
+    padding-top: 1.5rem;
+    padding-bottom: 9.5rem !important;
+    max-width: 100%;
+}
 .hero-card {
-    background: linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%);
-    border: 1px solid #334155;
+    background: linear-gradient(135deg, rgba(30, 58, 138, 0.35) 0%, rgba(15, 23, 42, 0.55) 100%);
+    border: 1px solid rgba(148, 163, 184, 0.3);
     border-radius: 14px;
     padding: 1.1rem 1.3rem;
     margin-bottom: 1rem;
 }
-.hero-title {font-size: 1.3rem; font-weight: 700; color: #F8FAFC; margin: 0 0 0.4rem 0;}
+.hero-title {font-size: 1.3rem; font-weight: 700; margin: 0 0 0.45rem 0;}
 .badge-pill {
     display: inline-block; padding: 0.18rem 0.6rem; margin: 0.15rem 0.25rem 0 0;
     border-radius: 999px; font-size: 0.75rem; font-weight: 500;
-    background: rgba(59,130,246,0.2); border: 1px solid #60A5FA; color: #BFDBFE;
+    background: rgba(59,130,246,0.18); border: 1px solid rgba(96,165,250,0.45);
 }
-.badge-green {background: rgba(16,185,129,0.2); border-color: #34D399; color: #A7F3D0;}
+.badge-green {background: rgba(16,185,129,0.18); border-color: rgba(52,211,153,0.45);}
 [data-testid="stChatMessage"] {
-    border-radius: 12px; padding: 0.9rem 1rem; margin-bottom: 0.65rem;
-    border: 1px solid #1E293B; background-color: #111827;
+    border-radius: 12px; padding: 0.9rem 1rem; margin-bottom: 0.7rem;
+    border: 1px solid rgba(148, 163, 184, 0.2);
 }
 .sidebar-stat {
-    background: #1E293B; border: 1px solid #334155;
+    border: 1px solid rgba(148, 163, 184, 0.25);
     border-radius: 10px; padding: 0.7rem 0.85rem; margin-bottom: 0.8rem; font-size: 0.82rem;
 }
 </style>
@@ -101,7 +105,7 @@ with st.sidebar:
 
     st.markdown(
         f'<div class="sidebar-stat"><b>📄 {len(doc_names)} Dokumen • 🧩 {total_chunks_all} Chunks</b><br>'
-        f'<span style="color:#94A3B8;font-size:0.75rem;">Model: {LLM_MODEL}</span></div>',
+        f'<span style="opacity:0.75;font-size:0.75rem;">Model: {LLM_MODEL}</span></div>',
         unsafe_allow_html=True,
     )
 
