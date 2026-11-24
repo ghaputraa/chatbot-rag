@@ -32,3 +32,6 @@ htmlcov/
 Thumbs.db
 .vscode/
 .idea/
+
+# Log Percakapan Lokal & Ekspor Evaluasi
+data/logs/

@@ -1,6 +1,7 @@
 ﻿import os
 import json
 import hashlib
+import mimetypes
 import pdfplumber
 from langchain_core.documents import Document
 from langchain_community.document_loaders import Docx2txtLoader, TextLoader
@@ -12,7 +13,7 @@ from app.config import (
     DATA_DIR,
     CHROMA_DIR,
     COLLECTION_NAME,
-    SUPPORTED_EXTENSIONS,
+    SUPPORTED_MIME_TYPES,
     EMBEDDING_MODEL,
     CHUNK_SIZE,
     CHUNK_OVERLAP,
@@ -20,6 +21,29 @@ from app.config import (
 
 _EMBEDDINGS_CACHE = None
 MANIFEST_PATH = os.path.join(CHROMA_DIR, "indexed_manifest.json")
+
+# Registrasi eksplisit agar konsisten di Windows maupun container Linux Streamlit Cloud
+mimetypes.add_type("application/pdf", ".pdf")
+mimetypes.add_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx")
+mimetypes.add_type("text/plain", ".txt")
+
+
+def detect_mime_type(file_path: str) -> str:
+    """Mendeteksi MIME type file menggunakan file signature (magic bytes) dan library mimetypes."""
+    try:
+        with open(file_path, "rb") as f:
+            header = f.read(8)
+        if header.startswith(b"%PDF-"):
+            return "application/pdf"
+        if header.startswith(b"PK\x03\x04"):
+            guessed, _ = mimetypes.guess_type(file_path)
+            if guessed == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                return guessed
+    except Exception:
+        pass
+
+    guessed_mime, _ = mimetypes.guess_type(file_path)
+    return guessed_mime or "application/octet-stream"
 
 
 def get_embeddings():
@@ -102,7 +126,7 @@ def _format_table_as_markdown(table: list[list[str | None]]) -> str:
     return "\n".join(lines)
 
 
-def _extract_pdf_with_pdfplumber(file_path: str) -> list[Document]:
+def _extract_pdf_with_pdfplumber(file_path: str, mime_type: str = "application/pdf") -> list[Document]:
     """Mengekstrak teks paragraf dan tabel PDF secara terpisah menggunakan pdfplumber."""
     docs = []
     filename = os.path.basename(file_path)
@@ -147,6 +171,7 @@ def _extract_pdf_with_pdfplumber(file_path: str) -> list[Document]:
                         page_content=full_page_content,
                         metadata={
                             "source": filename,
+                            "mime_type": mime_type,
                             "page": idx,
                             "total_pages": total_pages,
                         },
@@ -156,14 +181,17 @@ def _extract_pdf_with_pdfplumber(file_path: str) -> list[Document]:
 
 
 def load_single_document(file_path: str) -> list[Document]:
-    ext = os.path.splitext(file_path)[1].lower()
     filename = os.path.basename(file_path)
+    mime_type = detect_mime_type(file_path)
 
-    if ext == ".pdf":
-        return _extract_pdf_with_pdfplumber(file_path)
-    elif ext == ".docx":
+    if mime_type not in SUPPORTED_MIME_TYPES:
+        return []
+
+    if mime_type == "application/pdf":
+        return _extract_pdf_with_pdfplumber(file_path, mime_type=mime_type)
+    elif mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
         loader = Docx2txtLoader(file_path)
-    elif ext == ".txt":
+    elif mime_type == "text/plain":
         loader = TextLoader(file_path, encoding="utf-8")
     else:
         return []
@@ -173,6 +201,7 @@ def load_single_document(file_path: str) -> list[Document]:
 
     for idx, doc in enumerate(docs):
         doc.metadata["source"] = filename
+        doc.metadata["mime_type"] = mime_type
         if "page" not in doc.metadata:
             doc.metadata["page"] = idx
         if "total_pages" not in doc.metadata:
@@ -204,10 +233,13 @@ def sync_documents(vector_store: Chroma) -> dict:
     )
 
     for filename in os.listdir(DATA_DIR):
-        if not filename.lower().endswith(SUPPORTED_EXTENSIONS):
+        file_path = os.path.join(DATA_DIR, filename)
+        if not os.path.isfile(file_path):
             continue
 
-        file_path = os.path.join(DATA_DIR, filename)
+        if detect_mime_type(file_path) not in SUPPORTED_MIME_TYPES:
+            continue
+
         current_mtime = os.path.getmtime(file_path)
 
         if filename in manifest and manifest[filename] == current_mtime:
@@ -278,6 +310,23 @@ def list_indexed_documents(vector_store: Chroma) -> dict[str, int]:
     return doc_counts
 
 
+def list_indexed_documents_info(vector_store: Chroma) -> dict[str, dict]:
+    """Mengembalikan {nama_file: {'chunks': int, 'mime_type': str}} untuk ditampilkan di UI."""
+    raw_data = vector_store.get(include=["metadatas"])
+    metadatas = raw_data.get("metadatas") or []
+
+    info: dict[str, dict] = {}
+    for meta in metadatas:
+        if not meta:
+            continue
+        src = os.path.basename(meta.get("source", "Unknown"))
+        mime = meta.get("mime_type") or detect_mime_type(os.path.join(DATA_DIR, src))
+        if src not in info:
+            info[src] = {"chunks": 0, "mime_type": mime}
+        info[src]["chunks"] += 1
+    return info
+
+
 def delete_document_by_name(vector_store: Chroma, filename: str) -> int:
     """Menghapus seluruh chunk milik dokumen tertentu dari ChromaDB."""
     target_name = os.path.basename(filename)
@@ -303,5 +352,3 @@ def list_documents(vector_store: Chroma) -> list[str]:
 def delete_document(vector_store: Chroma, filename: str) -> int:
     """Alias kompatibilitas untuk main.py: menghapus dokumen berdasarkan nama file."""
     return delete_document_by_name(vector_store, filename)
-
-

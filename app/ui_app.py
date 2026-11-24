@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -6,19 +6,33 @@ if str(ROOT_DIR) not in sys.path:
 
 import os
 import re
+import json
+import uuid
+import mimetypes
 import warnings
+from datetime import datetime
+from urllib.parse import quote
 import streamlit as st
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-from app.config import DATA_DIR, LLM_MODEL, SUPPORTED_EXTENSIONS
+from app.config import DATA_DIR, LLM_MODEL, SUPPORTED_MIME_TYPES
 from app.core.vector_db import (
     get_vectorstore,
     sync_documents,
-    list_indexed_documents,
+    list_indexed_documents_info,
     delete_document_by_name,
 )
 from app.core.rag_engine import ConversationalHybridRAG
+
+# Konfigurasi Log & Nomor WhatsApp Staf Manusia (Dealer Suzuki Cinere)
+LOG_DIR = os.path.join(os.path.dirname(DATA_DIR), "logs")
+CHAT_LOG_FILE = os.path.join(LOG_DIR, "chat_logs.json")
+STAFF_WHATSAPP_NUMBER = "6281234567890"  # Ganti dengan nomor resmi Sales/CS Suzuki Cinere
+
+mimetypes.add_type("application/pdf", ".pdf")
+mimetypes.add_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx")
+mimetypes.add_type("text/plain", ".txt")
 
 st.set_page_config(
     page_title="Suzuki Cinere — AI Concierge",
@@ -45,7 +59,6 @@ footer {visibility: hidden;}
     max-width: 920px !important;
 }
 
-/* Hero Banner dengan Aksen Suzuki (Biru & Merah) */
 .hero-wrapper {
     position: relative;
     border-radius: 16px;
@@ -91,7 +104,6 @@ footer {visibility: hidden;}
     border-color: rgba(52, 211, 153, 0.4);
 }
 
-/* Chat Message Card */
 [data-testid="stChatMessage"] {
     border-radius: 14px;
     padding: 0.9rem 1rem !important;
@@ -117,7 +129,6 @@ footer {visibility: hidden;}
     border-collapse: collapse;
 }
 
-/* Sidebar Card */
 .kb-card {
     border-radius: 12px;
     padding: 0.8rem 0.9rem;
@@ -125,6 +136,15 @@ footer {visibility: hidden;}
     border: 1px solid rgba(148, 163, 184, 0.25);
     background: rgba(30, 41, 59, 0.35);
     font-size: 0.82rem;
+}
+
+.escalation-box {
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    margin-top: 0.65rem;
+    background: rgba(225, 29, 72, 0.12);
+    border: 1px solid rgba(244, 63, 94, 0.45);
+    font-size: 0.85rem;
 }
 
 .stButton > button {
@@ -138,6 +158,52 @@ footer {visibility: hidden;}
 }
 </style>
 """, unsafe_allow_html=True)
+
+
+# ==============================================================================
+# UTILITAS LOGGING & NORMALISASI
+# ==============================================================================
+def _load_logs() -> list[dict]:
+    os.makedirs(LOG_DIR, exist_ok=True)
+    if os.path.exists(CHAT_LOG_FILE):
+        try:
+            with open(CHAT_LOG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+
+def _save_logs(logs: list[dict]):
+    os.makedirs(LOG_DIR, exist_ok=True)
+    with open(CHAT_LOG_FILE, "w", encoding="utf-8") as f:
+        json.dump(logs, f, indent=2, ensure_ascii=False)
+
+
+def append_chat_log(turn_id: str, question: str, answer: str, citations: list, needs_escalation: bool):
+    logs = _load_logs()
+    logs.append({
+        "turn_id": turn_id,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "question": question,
+        "answer": answer,
+        "citations_count": len(citations),
+        "sources": [c.get("source", "-") for c in citations],
+        "feedback": None,
+        "escalated_to_human": needs_escalation,
+    })
+    _save_logs(logs)
+
+
+def update_chat_feedback(turn_id: str, feedback_value: str, escalate: bool = False):
+    logs = _load_logs()
+    for entry in logs:
+        if entry.get("turn_id") == turn_id:
+            entry["feedback"] = feedback_value
+            if escalate:
+                entry["escalated_to_human"] = True
+            break
+    _save_logs(logs)
 
 
 def normalize_query_typos(text: str) -> str:
@@ -154,6 +220,17 @@ def normalize_query_typos(text: str) -> str:
     return text
 
 
+def build_whatsapp_escalation_url(user_question: str) -> str:
+    msg = (
+        f"Halo Staf Suzuki Cinere, saya membutuhkan bantuan lebih lanjut terkait pertanyaan berikut:\n"
+        f"\"{user_question}\""
+    )
+    return f"https://wa.me/{STAFF_WHATSAPP_NUMBER}?text={quote(msg)}"
+
+
+# ==============================================================================
+# INISIALISASI RESOURCE & SESSION STATE
+# ==============================================================================
 @st.cache_resource(show_spinner="Menyiapkan AI Assistant & Knowledge Base...")
 def init_vectorstore():
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -172,6 +249,10 @@ if "messages" not in st.session_state:
         "role": "assistant",
         "content": "Selamat datang di **Suzuki Cinere AI Concierge**. Tanyakan informasi harga OTR, spesifikasi kendaraan, promo, atau pilih pertanyaan cepat di bawah ini.",
         "citations": [],
+        "turn_id": None,
+        "question": "",
+        "feedback": None,
+        "needs_escalation": False,
     }]
 
 if "pending_prompt" not in st.session_state:
@@ -180,13 +261,13 @@ if "pending_prompt" not in st.session_state:
 rag_engine: ConversationalHybridRAG = st.session_state.rag_engine
 
 # ==============================================================================
-# SIDEBAR
+# SIDEBAR: PANEL ADMIN UNGGAH DOKUMEN & LOG PERCAKAPAN
 # ==============================================================================
 with st.sidebar:
-    st.markdown("### 📂 Knowledge Base")
-    indexed_docs = list_indexed_documents(vector_store)
-    doc_names = sorted(list(indexed_docs.keys()))
-    total_chunks_all = sum(indexed_docs.values())
+    st.markdown("### 📂 Panel Admin & Knowledge Base")
+    docs_info = list_indexed_documents_info(vector_store)
+    doc_names = sorted(list(docs_info.keys()))
+    total_chunks_all = sum(item["chunks"] for item in docs_info.values())
 
     st.markdown(
         f'<div class="kb-card">'
@@ -197,19 +278,43 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    st.markdown("**1. Unggah Dokumen (.pdf, .docx, .txt)**")
-    allowed_exts = [ext.lstrip(".") for ext in SUPPORTED_EXTENSIONS]
-    uploaded_files = st.file_uploader("Upload", type=allowed_exts, accept_multiple_files=True, label_visibility="collapsed")
+    st.markdown("**1. Unggah Dokumen (Validasi MIME)**")
+    uploader_types = [
+        ext.lstrip(".")
+        for mime in SUPPORTED_MIME_TYPES
+        if (ext := mimetypes.guess_extension(mime))
+    ]
+    uploaded_files = st.file_uploader(
+        "Upload",
+        type=uploader_types,
+        accept_multiple_files=True,
+        label_visibility="collapsed",
+    )
 
     if uploaded_files and st.button("📥 Simpan & Indeks Dokumen", use_container_width=True, type="primary"):
-        with st.spinner("Mengindeks dokumen..."):
-            for uf in uploaded_files:
-                with open(os.path.join(DATA_DIR, uf.name), "wb") as f:
-                    f.write(uf.getbuffer())
-            sync_res = sync_documents(vector_store)
-            rag_engine.refresh_retriever()
-            st.success(f"Berhasil diindeks ({sync_res.get('total_chunks', 0)} chunks).")
-            st.rerun()
+        valid_files = []
+        rejected_files = []
+
+        for uf in uploaded_files:
+            guessed_mime, _ = mimetypes.guess_type(uf.name)
+            file_mime = uf.type or guessed_mime or "application/octet-stream"
+            if file_mime in SUPPORTED_MIME_TYPES:
+                valid_files.append(uf)
+            else:
+                rejected_files.append(f"{uf.name} ({file_mime})")
+
+        if rejected_files:
+            st.error(f"MIME type ditolak: {', '.join(rejected_files)}")
+
+        if valid_files:
+            with st.spinner("Mengindeks dokumen..."):
+                for uf in valid_files:
+                    with open(os.path.join(DATA_DIR, uf.name), "wb") as f:
+                        f.write(uf.getbuffer())
+                sync_res = sync_documents(vector_store)
+                rag_engine.refresh_retriever()
+                st.success(f"{len(valid_files)} file berhasil diindeks ({sync_res.get('total_chunks', 0)} chunks).")
+                st.rerun()
 
     st.divider()
     st.markdown("**2. Filter Fokus Dokumen**")
@@ -225,7 +330,9 @@ with st.sidebar:
     else:
         for name in doc_names:
             c1, c2 = st.columns([4.5, 1])
-            c1.markdown(f"📄 **{name}**  \n`{indexed_docs[name]} chunks`")
+            chunk_cnt = docs_info[name]["chunks"]
+            mime_val = docs_info[name]["mime_type"]
+            c1.markdown(f"📄 **{name}**  \n`{chunk_cnt} chunks` • `{mime_val}`")
             if c2.button("🗑️", key=f"del_{name}", help=f"Hapus {name}"):
                 delete_document_by_name(vector_store, name)
                 p = os.path.join(DATA_DIR, name)
@@ -238,12 +345,33 @@ with st.sidebar:
                 st.rerun()
 
     st.divider()
+    st.markdown("**4. Log Percakapan & Evaluasi**")
+    all_logs = _load_logs()
+    up_count = sum(1 for l in all_logs if l.get("feedback") == "up")
+    down_count = sum(1 for l in all_logs if l.get("feedback") == "down")
+    esc_count = sum(1 for l in all_logs if l.get("escalated_to_human"))
+    st.caption(f"Total Log: **{len(all_logs)}** | 👍 {up_count} | 👎 {down_count} | 🧑 Eskalasi: {esc_count}")
+
+    if all_logs:
+        st.download_button(
+            label="📥 Unduh Log Percakapan (JSON)",
+            data=json.dumps(all_logs, indent=2, ensure_ascii=False),
+            file_name="suzuki_cinere_chat_logs.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+
+    st.divider()
     if st.button("🧹 Reset Percakapan", use_container_width=True):
         rag_engine.clear_history()
         st.session_state.messages = [{
             "role": "assistant",
             "content": "Riwayat percakapan telah dibersihkan. Silakan ajukan pertanyaan baru!",
             "citations": [],
+            "turn_id": None,
+            "question": "",
+            "feedback": None,
+            "needs_escalation": False,
         }]
         st.rerun()
 
@@ -258,30 +386,72 @@ st.markdown(
     f'<div class="chip-row">'
     f'<span class="chip chip-live">● Sistem Aktif</span>'
     f'<span class="chip">{scope_label}</span>'
-    f'<span class="chip">⚡ Hybrid RAG + Sitasi</span>'
+    f'<span class="chip">⚡ Hybrid RAG + MIME Verified</span>'
     f'</div></div>',
     unsafe_allow_html=True,
 )
 
 # ==============================================================================
-# TAMPILAN RIWAYAT CHAT
+# TAMPILAN RIWAYAT CHAT, SITASI, FEEDBACK & ESKALASI STAF
 # ==============================================================================
-for msg in st.session_state.messages:
+for idx_msg, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        citations = msg.get("citations", [])
-        if citations:
-            with st.expander(f"📚 Sumber Rujukan ({len(citations)} bagian)"):
-                for idx, c in enumerate(citations, 1):
-                    src = c.get("source", c.get("document", "Dokumen"))
-                    pg = c.get("page", "-")
-                    snip = str(c.get("snippet", "")).strip()
-                    st.markdown(f"**{idx}. {src}** (Hal. {pg})")
-                    if snip:
-                        st.caption(snip[:300] + ("..." if len(snip) > 300 else ""))
+
+        if msg["role"] == "assistant":
+            citations = msg.get("citations", [])
+            if citations:
+                with st.expander(f"📚 Sumber Rujukan ({len(citations)} bagian)"):
+                    for idx, c in enumerate(citations, 1):
+                        src = c.get("source", c.get("document", "Dokumen"))
+                        pg = c.get("page", "-")
+                        snip = str(c.get("snippet", "")).strip()
+                        st.markdown(f"**{idx}. {src}** (Hal. {pg})")
+                        if snip:
+                            st.caption(snip[:300] + ("..." if len(snip) > 300 else ""))
+
+            # Kotak Eskalasi ke Staf Manusia jika informasi tidak ditemukan atau user memberi jempol bawah
+            if msg.get("needs_escalation") or msg.get("feedback") == "down":
+                wa_url = build_whatsapp_escalation_url(msg.get("question", "Pertanyaan layanan Suzuki Cinere"))
+                st.markdown(
+                    f'<div class="escalation-box">'
+                    f'<strong>🧑 Butuh Bantuan Staf Manusia?</strong><br>'
+                    f'Informasi spesifik belum tersedia di dokumen atau Anda memerlukan bantuan lebih lanjut. '
+                    f'Hubungi langsung tim Sales / Customer Service Suzuki Cinere:<br><br>'
+                    f'<a href="{wa_url}" target="_blank" style="display:inline-block;padding:0.4rem 0.85rem;'
+                    f'background:#16A34A;color:#FFFFFF;border-radius:8px;text-decoration:none;font-weight:600;">'
+                    f'💬 Hubungi Staf Suzuki Cinere (WhatsApp)</a>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+            # Tombol Umpan Balik Jempol Atas / Bawah untuk setiap respons AI
+            turn_id = msg.get("turn_id")
+            if turn_id:
+                fb_state = msg.get("feedback")
+                col_fb1, col_fb2, col_fb3 = st.columns([1.2, 1.2, 5.6])
+                with col_fb1:
+                    if st.button(
+                        "👍 Membantu" if fb_state == "up" else "👍",
+                        key=f"up_{turn_id}",
+                        type="primary" if fb_state == "up" else "secondary",
+                    ):
+                        st.session_state.messages[idx_msg]["feedback"] = "up"
+                        update_chat_feedback(turn_id, "up")
+                        st.rerun()
+                with col_fb2:
+                    if st.button(
+                        "👎 Kurang Tepat" if fb_state == "down" else "👎",
+                        key=f"down_{turn_id}",
+                        type="primary" if fb_state == "down" else "secondary",
+                    ):
+                        st.session_state.messages[idx_msg]["feedback"] = "down"
+                        st.session_state.messages[idx_msg]["needs_escalation"] = True
+                        update_chat_feedback(turn_id, "down", escalate=True)
+                        st.rerun()
 
 # ==============================================================================
-# QUICK PROMPTS (MUNCUL SAAT CHAT BARU DIMULAI)
+# QUICK PROMPTS
 # ==============================================================================
 if len(st.session_state.messages) == 1 and doc_names:
     st.caption("💡 Pertanyaan cepat:")
@@ -297,7 +467,7 @@ if len(st.session_state.messages) == 1 and doc_names:
             st.rerun()
 
 # ==============================================================================
-# PROSES INPUT PERTANYAAN (DARI CHAT INPUT ATAU QUICK PROMPT)
+# PROSES INPUT PERTANYAAN
 # ==============================================================================
 user_input = st.chat_input("Tanyakan harga OTR, spesifikasi mobil, atau isi dokumen...")
 active_prompt = st.session_state.pending_prompt or user_input
@@ -307,39 +477,55 @@ if active_prompt:
     if not doc_names:
         st.warning("⚠️ Database dokumen masih kosong. Unggah dokumen di panel kiri.")
     else:
-        st.session_state.messages.append({"role": "user", "content": active_prompt, "citations": []})
+        st.session_state.messages.append({
+            "role": "user",
+            "content": active_prompt,
+            "citations": [],
+        })
         with st.chat_message("user"):
             st.markdown(active_prompt)
 
         clean_query = normalize_query_typos(active_prompt)
+        turn_id = str(uuid.uuid4())[:8]
+
         with st.chat_message("assistant"):
             with st.spinner("Menelusuri dokumen & menyusun jawaban..."):
                 clean_citations = []
+                needs_escalation = False
                 try:
                     res = rag_engine.ask(clean_query)
                     answer_text = res.get("answer", "")
-                    if "informasi tidak tersedia" not in answer_text.lower():
+                    lower_ans = answer_text.lower()
+
+                    if (
+                        "informasi tidak tersedia" in lower_ans
+                        or "tidak ditemukan" in lower_ans
+                        or "[sumber: tidak ada]" in lower_ans
+                    ):
+                        needs_escalation = True
+                        clean_citations = []
+                    else:
                         clean_citations = [
                             c for c in res.get("citations", [])
                             if isinstance(c, dict) and str(c.get("snippet", "")).strip()
                         ]
                 except Exception as e:
-                    answer_text = "⏳ Batas API Groq tercapai, silakan coba beberapa detik lagi." if "429" in str(e) else f"❌ Terjadi kesalahan: {e}"
+                    needs_escalation = True
+                    answer_text = (
+                        "⏳ Batas API Groq tercapai, silakan coba beberapa detik lagi."
+                        if "429" in str(e)
+                        else f"❌ Terjadi kesalahan sistem: {e}"
+                    )
 
-            st.markdown(answer_text)
-            if clean_citations:
-                with st.expander(f"📚 Sumber Rujukan ({len(clean_citations)} bagian)"):
-                    for idx, c in enumerate(clean_citations, 1):
-                        src = c.get("source", c.get("document", "Dokumen"))
-                        pg = c.get("page", "-")
-                        snip = str(c.get("snippet", "")).strip()
-                        st.markdown(f"**{idx}. {src}** (Hal. {pg})")
-                        if snip:
-                            st.caption(snip[:300] + ("..." if len(snip) > 300 else ""))
+            append_chat_log(turn_id, active_prompt, answer_text, clean_citations, needs_escalation)
 
             st.session_state.messages.append({
                 "role": "assistant",
                 "content": answer_text,
                 "citations": clean_citations,
+                "turn_id": turn_id,
+                "question": active_prompt,
+                "feedback": None,
+                "needs_escalation": needs_escalation,
             })
         st.rerun()

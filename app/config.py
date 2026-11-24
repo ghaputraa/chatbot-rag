@@ -18,7 +18,13 @@ STATIC_DIR = str(BASE_DIR / "app" / "static")
 CHROMA_DIR = str(BASE_DIR / "chroma_db")
 
 COLLECTION_NAME = "rag_docs_collection"
-SUPPORTED_EXTENSIONS = (".pdf", ".docx", ".txt")
+
+# Konfigurasi Dokumen (Single Source of Truth: MIME Type)
+SUPPORTED_MIME_TYPES = (
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+)
 
 # Konfigurasi Model & Embedding
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
@@ -48,4 +54,3 @@ GROQ_API_KEYS = [
     for k in (os.getenv("GROQ_API_KEYS") or GROQ_API_KEY).split(",")
     if k.strip()
 ]
-
